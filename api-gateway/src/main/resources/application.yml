@@ -1,0 +1,15 @@
+spring:
+  application:
+    # Ce nom determine le fichier lu chez le config-server : config-repo/api-gateway.yml
+    name: api-gateway
+  config:
+    # Pas de "optional:" : on veut que le service refuse de demarrer plutot que
+    # de demarrer avec une configuration incomplete.
+    import: configserver:${CONFIG_SERVER_URL:http://localhost:8888}
+  cloud:
+    config:
+      fail-fast: true
+      retry:
+        max-attempts: 20
+        initial-interval: 2000
+        max-interval: 5000

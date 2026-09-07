@@ -1,0 +1,31 @@
+spring:
+  application:
+    name: loan-service
+  cloud:
+    config:
+      enabled: false
+      import-check:
+        enabled: false
+  datasource:
+    url: jdbc:h2:mem:loandb-test;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: create-drop
+
+eureka:
+  client:
+    enabled: false
+    register-with-eureka: false
+    fetch-registry: false
+
+library:
+  loan:
+    duration-days: 14
+    max-active-loans-per-member: 3
+
+logging:
+  level:
+    root: WARN

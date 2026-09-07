@@ -1,0 +1,56 @@
+server:
+  port: 8092
+
+spring:
+  datasource:
+    url: jdbc:h2:mem:loandb;DB_CLOSE_DELAY=-1
+    driver-class-name: org.h2.Driver
+    username: sa
+    password: ""
+  jpa:
+    hibernate:
+      ddl-auto: update
+    show-sql: false
+  h2:
+    console:
+      enabled: true
+      path: /h2-console
+  cloud:
+    openfeign:
+      # Apache HttpClient 5 : necessaire pour que Feign sache envoyer des requetes PATCH
+      httpclient:
+        hc5:
+          enabled: true
+      client:
+        config:
+          default:
+            connectTimeout: 3000
+            readTimeout: 5000
+            loggerLevel: basic
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+  instance:
+    prefer-ip-address: true
+
+# Regles metier parametrables (voir LoanProperties)
+library:
+  loan:
+    duration-days: 14
+    max-active-loans-per-member: 3
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info
+
+springdoc:
+  swagger-ui:
+    path: /swagger-ui.html
+
+logging:
+  level:
+    com.biblio.loan.client.BookClient: DEBUG

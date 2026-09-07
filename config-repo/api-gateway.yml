@@ -1,0 +1,35 @@
+server:
+  port: 8080
+
+spring:
+  cloud:
+    gateway:
+      # Les deux routes ajoutees pour l'exercice final.
+      # lb:// = "load-balanced" : le nom est resolu via Eureka, pas via une IP en dur.
+      routes:
+        - id: book-service
+          uri: lb://book-service
+          predicates:
+            - Path=/api/books/**
+        - id: loan-service
+          uri: lb://loan-service
+          predicates:
+            - Path=/api/loans/**
+      discovery:
+        locator:
+          enabled: false
+
+eureka:
+  client:
+    service-url:
+      defaultZone: ${EUREKA_URL:http://localhost:8761/eureka}
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,gateway
+
+logging:
+  level:
+    org.springframework.cloud.gateway: INFO

@@ -1,0 +1,21 @@
+server:
+  port: 8761
+
+spring:
+  application:
+    name: eureka-server
+
+eureka:
+  client:
+    # Le serveur Eureka n'a pas besoin de s'enregistrer aupres de lui-meme
+    register-with-eureka: false
+    fetch-registry: false
+  server:
+    # Desactive le mode auto-preservation : pratique en dev, a laisser actif en prod
+    enable-self-preservation: false
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info

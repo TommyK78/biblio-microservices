@@ -1,0 +1,121 @@
+# Architecture complete : 5 services.
+# L'ordre de demarrage est impose par depends_on + healthcheck : un service ne
+# demarre que lorsque celui dont il depend repond reellement sur /actuator/health.
+services:
+
+  eureka-server:
+    build:
+      context: .
+      dockerfile: eureka-server/Dockerfile
+    container_name: eureka-server
+    ports:
+      - "8761:8761"
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8761/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - biblio
+
+  config-server:
+    build:
+      context: .
+      dockerfile: config-server/Dockerfile
+    container_name: config-server
+    ports:
+      - "8888:8888"
+    volumes:
+      # Le dossier config-repo est monte en lecture seule : modifier un .yml
+      # ne demande pas de reconstruire l'image.
+      - ./config-repo:/config-repo:ro
+    environment:
+      CONFIG_REPO_LOCATION: file:/config-repo
+      EUREKA_URL: http://eureka-server:8761/eureka
+    depends_on:
+      eureka-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8888/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 30s
+    networks:
+      - biblio
+
+  book-service:
+    build:
+      context: .
+      dockerfile: book-service/Dockerfile
+    container_name: book-service
+    ports:
+      - "8091:8091"
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://eureka-server:8761/eureka
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8091/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    networks:
+      - biblio
+
+  loan-service:
+    build:
+      context: .
+      dockerfile: loan-service/Dockerfile
+    container_name: loan-service
+    ports:
+      - "8092:8092"
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://eureka-server:8761/eureka
+    depends_on:
+      config-server:
+        condition: service_healthy
+      book-service:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8092/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    networks:
+      - biblio
+
+  api-gateway:
+    build:
+      context: .
+      dockerfile: api-gateway/Dockerfile
+    container_name: api-gateway
+    ports:
+      # 8085 cote machine car le port 8080 est deja pris par un autre projet.
+      # A l'interieur du conteneur la gateway ecoute toujours sur 8080.
+      # Si 8080 est libre chez vous, remettez simplement "8080:8080".
+      - "8085:8080"
+    environment:
+      CONFIG_SERVER_URL: http://config-server:8888
+      EUREKA_URL: http://eureka-server:8761/eureka
+    depends_on:
+      config-server:
+        condition: service_healthy
+    healthcheck:
+      test: ["CMD", "curl", "-f", "http://localhost:8080/actuator/health"]
+      interval: 10s
+      timeout: 5s
+      retries: 15
+      start_period: 40s
+    networks:
+      - biblio
+
+networks:
+  biblio:
+    driver: bridge

@@ -1,0 +1,126 @@
+### Scenario complet de la bibliotheque, teste UNIQUEMENT via l'api-gateway (port 8080).
+### Aucun appel direct sur 8091 / 8092 : c'est tout l'interet de la gateway.
+###
+### VS Code : extension "REST Client" -> cliquer sur "Send Request" au-dessus de chaque bloc.
+### IntelliJ : support natif des fichiers .http.
+
+### Port 8085 car 8080 etait deja occupe sur cette machine par un autre projet.
+### La gateway ecoute bien sur 8080 a l'interieur de son conteneur.
+@gateway = http://localhost:8085
+
+### ---------------------------------------------------------------------------
+### 1. Creer un livre (2 exemplaires). availableCopies est initialise a totalCopies.
+### Attendu : 201 Created
+# @name createBook
+POST {{gateway}}/api/books
+Content-Type: application/json
+
+{
+  "title": "Dune",
+  "author": "Frank Herbert",
+  "isbn": "978-0441013593",
+  "totalCopies": 2
+}
+
+### Recupere l'id du livre cree pour les requetes suivantes
+@bookId = {{createBook.response.body.id}}
+
+### ---------------------------------------------------------------------------
+### 2. Verifier le livre : totalCopies = 2, availableCopies = 2
+### Attendu : 200 OK
+GET {{gateway}}/api/books/{{bookId}}
+
+### ---------------------------------------------------------------------------
+### 3. Premier emprunt : reussi. Le stock passe a 1.
+### Attendu : 201 Created, status ACTIVE, dueDate = loanDate + 14 jours
+# @name createLoan1
+POST {{gateway}}/api/loans
+Content-Type: application/json
+
+{
+  "memberName": "Bob",
+  "bookId": {{bookId}}
+}
+
+@loanId = {{createLoan1.response.body.id}}
+
+### ---------------------------------------------------------------------------
+### 4. Deuxieme emprunt : reussi. Le stock passe a 0.
+### Attendu : 201 Created
+POST {{gateway}}/api/loans
+Content-Type: application/json
+
+{
+  "memberName": "Alice",
+  "bookId": {{bookId}}
+}
+
+### ---------------------------------------------------------------------------
+### 5. Verifier que availableCopies vaut bien 0
+### Attendu : 200 OK, availableCopies = 0
+GET {{gateway}}/api/books/{{bookId}}
+
+### ---------------------------------------------------------------------------
+### 6. Troisieme emprunt : REFUSE, plus aucun exemplaire.
+### Attendu : 409 Conflict, "Aucun exemplaire disponible pour ce livre"
+### (loan-service ne doit PAS appeler decrement-stock dans ce cas)
+POST {{gateway}}/api/loans
+Content-Type: application/json
+
+{
+  "memberName": "Charlie",
+  "bookId": {{bookId}}
+}
+
+### ---------------------------------------------------------------------------
+### 7. Emprunt sur un livre inexistant
+### Attendu : 400 Bad Request
+POST {{gateway}}/api/loans
+Content-Type: application/json
+
+{
+  "memberName": "Bob",
+  "bookId": 999999
+}
+
+### ---------------------------------------------------------------------------
+### 8. Retour du premier emprunt : le stock remonte a 1.
+### Attendu : 200 OK, status RETURNED, returnDate remplie
+PATCH {{gateway}}/api/loans/{{loanId}}/return
+
+### ---------------------------------------------------------------------------
+### 9. Rendre DEUX FOIS le meme emprunt
+### Attendu : 409 Conflict, "Cet emprunt est deja termine"
+PATCH {{gateway}}/api/loans/{{loanId}}/return
+
+### ---------------------------------------------------------------------------
+### 10. Le stock est bien remonte a 1 (et pas a 2 : un seul retour a ete pris en compte)
+### Attendu : 200 OK, availableCopies = 1
+GET {{gateway}}/api/books/{{bookId}}
+
+### ---------------------------------------------------------------------------
+### 11. Lister tous les emprunts
+GET {{gateway}}/api/loans
+
+### ---------------------------------------------------------------------------
+### 12. Recherche par auteur (bonus)
+GET {{gateway}}/api/books?author=herbert
+
+### ---------------------------------------------------------------------------
+### 13. Validation : payload invalide
+### Attendu : 400 Bad Request avec le detail par champ
+POST {{gateway}}/api/books
+Content-Type: application/json
+
+{
+  "title": "",
+  "author": "X",
+  "isbn": "123",
+  "totalCopies": 0
+}
+
+### ---------------------------------------------------------------------------
+### 14. Defense en profondeur : appeler directement l'endpoint interne de book-service
+### sur un livre epuise. Meme sans passer par loan-service, book-service refuse.
+### Attendu : 409 Conflict quand availableCopies vaut 0
+PATCH {{gateway}}/api/books/{{bookId}}/decrement-stock
